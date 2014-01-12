@@ -49,12 +49,32 @@ function (EntityUtils, Vector3, Material, ShaderLib, Box) {
                                       Vector3.UNIT_Y)
     }
 
+    // FIXME: find alternatives?
+    function isArray(object) {
+        return object !== null && typeof object == "object" &&
+                'splice' in object && 'join' in object }
+    function isHash(object) {
+        return object &&
+            typeof object=="object" &&
+            (object==window||object instanceof Object) &&
+            !object.nodeName &&
+            !isArray(object)
+    }
+    function isFunction(object) { return typeof object == "function"}
+    function isString(object) { return typeof object == "string" }
+    function isNumber(object) { return typeof object == "number" }
+
     return {
         init: init,
         gooBox: gooBox,
         gooBoxFrom2dObj: gooBoxFrom2dObj,
         moveRotate2dObj: moveRotate2dObj,
         gooBoxFrom2dObjB: gooBoxFrom2dObjB,
-        cameraTrack2dObj: cameraTrack2dObj
+        cameraTrack2dObj: cameraTrack2dObj,
+        isArray: isArray,
+        isHash: isHash,
+        isFunction: isFunction,
+        isString: isString,
+        isNumber: isNumber
     }
 })

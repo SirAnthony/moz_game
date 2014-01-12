@@ -1,14 +1,16 @@
 define([
     'lib/phaser',
-    'js/maps',
+    'js/levels',
     'js/util'
 ],
-function (phaser, maps, util) {
-    var height = 200, width = 3 * height, bottom = height * 0.666|0,
-        jumpButton = ' '.charCodeAt(), pad = 60, drop = bottom - 40,
+function (phaser, LevelManager, util) {
+    var jumpButton = phaser.Keyboard.SPACEBAR,
+        pauseButton = phaser.Keyboard.P,
         domLevel = document.getElementById('level'),
         domDeaths = document.getElementById('deaths'),
-        game = new phaser.Game(width, height, phaser.AUTO, 'ninjacy')
+        levels = new LevelManager(),
+        game = new phaser.Game(levels.constants.width, levels.constants.height,
+                                phaser.AUTO, 'ninjacy')
 
     function loading() {}
     function running() { this.pause = true, this.deaths = 0 }
@@ -25,33 +27,23 @@ function (phaser, maps, util) {
     loading.prototype.create = function () { game.state.start('running') }
 
     running.prototype.create = function () {
-        this.ground = game.add.sprite(0.5 * width, bottom, 'ground')
-        this.ground.anchor.setTo(0.5, 0.5)
-        this.ground.body.immovable = true
-
-        this.player = game.add.sprite(pad, drop, 'box')
-        this.player.anchor.setTo(0.5, 0.5)
-        this.player.body.gravity.setTo(0, 12)
-
-        this.blocks = game.add.group()
-        this.blocks.createMultiple(20, 'box')
-
         this.spacebar = game.input.keyboard.addKey(jumpButton)
         game.input.keyboard.addKeyCapture(jumpButton)
 
-        this.ground3d = util.gooBoxFrom2dObj(this.ground, 2)
-        this.player3d = util.gooBoxFrom2dObj(this.player, 2, [0.8, 1, 0.4, 1])
-        this.blocks3d = []
+        this.pausekey = game.input.keyboard.addKey(pauseButton)
+        game.input.keyboard.addKeyCapture(pauseButton)
+        this.pausekey.onDown.add(this.stop, this)
 
         this.levelUp()
     }
 
     running.prototype.update = function () {
-        game.physics.collide(this.player, this.ground)
+        game.physics.collide(this.player, this.level.ground)
 
+        // TODO: More events to entities
         var jumping = this.spacebar.isDown,
-            landed = this.player.body.touching.down,
-            done = this.player.x >= width - pad
+            landed = this.level.player.body.touching.down,
+            done = this.level.player.x >= levels.constants.end
 
         if (landed) {
             if (jumping) {
@@ -62,15 +54,20 @@ function (phaser, maps, util) {
         }
 
         if (done) this.reset(), this.levelUp()
-        else game.physics.overlap(this.player, this.blocks,
+        else game.physics.overlap(this.level.player, this.level.blocks,
                                   this.crashed, 0, this)
 
-        util.moveRotate2dObj(this.player3d, this.player)
-        util.cameraTrack2dObj(game._goo.cam, this.player)
+        util.moveRotate2dObj(this.level.player3d, this.level.player)
+        util.cameraTrack2dObj(game._goo.cam, this.level.player)
     }
 
     running.prototype.start = function () {
         this.pause = false
+    }
+
+    running.prototype.stop = function () {
+        this.pause = true
+        this.reset()
     }
 
     running.prototype.run = function () {
@@ -84,44 +81,19 @@ function (phaser, maps, util) {
     }
 
     running.prototype.reset = function () {
-        this.player.reset(pad, drop)
+        this.player.reset(levels.constants.pad, levels.constants.drop)
         this.barrelRoll.pause().stop()
         this.player.angle = 0
     }
 
     running.prototype.levelUp = function () {
-        this.blocks.forEachAlive(function (b) { b.kill() })
-        this.level = (this.level|0) + 1
-
-        this.blocks3d.forEach(function (b) { b.removeFromWorld() })
-        this.blocks3d = []
-
-        maps[this.level].forEach(function (tile, n) { if (tile) {
-            var b = this.blocks.getFirstDead(), h, asc
-            switch (tile) {
-                case 1: case 2: case 3: case 4:
-                    asc = 0
-                    h = -0.1 * tile * tile + tile - 0.6
-                    break
-                case 5:
-                    asc = 22
-                    h = 0.3
-                    break
-                default: return
-            }
-            b.reset(n * b.width + 100, bottom - asc - 1)
-            b.anchor.setTo(0, 1)
-            b.scale.setTo(1, h)
-
-            this.blocks3d.push(util.gooBoxFrom2dObjB(b, 2))
-        }}, this)
-
-        domLevel.innerHTML = this.level
+        this.level = levels.nextLevel(game)
+        this.player = this.level.player
+        domLevel.innerHTML = this.level.name
     }
 
     running.prototype.crashed = function () {
         this.reset()
-
         domDeaths.innerHTML = ++this.deaths
     }
 
